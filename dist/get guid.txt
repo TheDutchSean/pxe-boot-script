@@ -1,0 +1,4 @@
+open powershell as admin and run:
+(Get-CimInstance Win32_ComputerSystemProduct).UUID
+
+add the guid to the next line of the guid.txt file in the root directory

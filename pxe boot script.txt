@@ -1,0 +1,49 @@
+https://www.reddit.com/r/MDT/comments/ue3d3v/have_windows_reboot_into_pxe_boot/?rdt=50481
+
+# This script will force a PXE boot on next boot if the computer is configured for UEFI boot (instead of Legacy boot).
+# Error Code 999 = Legacy Boot
+# Error Code 888 = PXE Boot option likely missing from script
+
+
+# Check for folder existence and create if missing.
+$FolderName = "C:\temp"
+if (Test-Path $FolderName) { 
+    Write-Host "$FolderName exists"
+}
+else
+{
+    New-Item $FolderName -ItemType Directory
+    Write-Host "$FolderName created successfully"
+}
+
+# Create list of boot options.
+bcdedit /enum firmware > $FolderName\firmware.txt
+
+# Check for Legacy Boot and exit if found.
+$fwbootmgr = Select-String -Path "$FolderName\firmware.txt" -Pattern "{fwbootmgr}"
+if (!$fwbootmgr){
+Write-Host "Device is configured for Legacy Boot. Please change to UEFI boot."
+Exit 999
+}
+Else {
+Write-Host "UEFI boot confirmed"
+}
+
+Try{
+# Get the line of text with the GUID for the PXE boot option.
+# IPV4 = most PXE boot options
+# EFI Network = Hyper-V PXE boot option
+$FullLine = (( Get-Content $FolderName\firmware.txt | Select-String "IPV4|EFI Network" -Context 1 -ErrorAction Stop ).context.precontext)[0]
+
+# Remove all text but the GUID
+$GUID = '{' + $FullLine.split('{')[1]
+
+# Add the PXE boot option to the top of the boot order on next boot
+bcdedit /set "{fwbootmgr}" bootsequence "$GUID"
+
+Write-Host "Device will PXE boot on restart."
+}
+Catch {
+Write-Host "An error occurred. The PXE boot option for this device may need to added to the script. Confirm the PXE boot option in the $FolderName\firmware.txt file."
+Exit 888
+}
